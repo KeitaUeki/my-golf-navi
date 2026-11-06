@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MY GOLF NAVI</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:#10251d;color:white;font-family:Arial,sans-serif;padding:20px}
+h1{text-align:center;color:#8df0a7;font-size:27px}
+p{text-align:center;color:#c9d8ce}
+.panel{background:#203d30;border-radius:18px;padding:18px;margin:16px 0}
+label{display:block;margin:12px 0 5px}
+input{width:100%;padding:13px;border:0;border-radius:9px;font-size:16px}
+button{width:100%;padding:15px;border:0;border-radius:12px;background:#8df0a7;color:#10251d;font-weight:bold;font-size:17px;margin-top:12px}
+.distances{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.distance{background:#315542;border-radius:12px;padding:15px 5px;text-align:center}
+.distance strong{display:block;font-size:27px;color:#a5ffb5;margin-top:12px}
+.small{font-size:12px;color:#c9d8ce}
+</style>
+</head>
+<body>
+<h1>⛳ MY GOLF NAVI</h1>
+<p>あなたのゴルフをもっと快適に</p>
+<div class="panel">
+<h3>📍 現在地</h3>
+<div id="status">GPS未取得</div>
+<button onclick="getGPS()">現在地を取得する</button>
+</div>
+<div class="panel">
+<h3>🏌️ グリーンの座標</h3>
+<p class="small">各地点の緯度・経度を入力してください</p>
+<div id="fields"></div>
+<button onclick="calculate()">距離を計算する</button>
+</div>
+<div class="panel">
+<h3>グリーンまでの距離</h3>
+<div class="distances">
+<div class="distance">手前<strong id="front">--</strong><span class="small">ヤード</span></div>
+<div class="distance">中央<strong id="center">--</strong><span class="small">ヤード</span></div>
+<div class="distance">奥<strong id="back">--</strong><span class="small">ヤード</span></div>
+</div>
+</div>
+<div class="panel">
+<h3>🌬️ 風・メモ</h3>
+<input id="wind" placeholder="風向き・風速などを入力">
+</div>
+<p class="small">MY GOLF NAVI Ver.1</p>
+<script>
+let pos=null;
+const names=['手前','中央','奥'];
+document.getElementById('fields').innerHTML=names.map((n,i)=>
+'<label>グリーン'+n+' 緯度</label><input id="lat'+i+'" type="number" step="any" placeholder="緯度">'+
+'<label>グリーン'+n+' 経度</label><input id="lon'+i+'" type="number" step="any" placeholder="経度">'
+).join('');
+function getGPS(){
+if(!navigator.geolocation){alert('GPSに対応していません');return}
+document.getElementById('status').textContent='位置情報を取得中...';
+navigator.geolocation.getCurrentPosition(p=>{
+pos={lat:p.coords.latitude,lon:p.coords.longitude};
+document.getElementById('status').textContent='現在地を取得しました';
+},e=>{document.getElementById('status').textContent='GPSを取得できません。位置情報の許可を確認してください'}, {enableHighAccuracy:true,timeout:15000});
+}
+function calculate(){
+if(!pos){alert('先に現在地を取得してください');return}
+names.forEach((n,i)=>{
+let lat=Number(document.getElementById('lat'+i).value);
+let lon=Number(document.getElementById('lon'+i).value);
+if(!lat||!lon){document.getElementById(['front','center','back'][i]).textContent='--';return}
+let r=Math.PI/180;
+let a=pos.lat*r,b=lat*r;
+let dlat=(lat-pos.lat)*r,dlon=(lon-pos.lon)*r;
+let x=Math.sin(dlat/2)**2+Math.cos(a)*Math.cos(b)*Math.sin(dlon/2)**2;
+let meters=6371000*2*Math.atan2(Math.sqrt(x),Math.sqrt(1-x));
+document.getElementById(['front','center','back'][i]).textContent=Math.round(meters*1.09361);
+});
+}
+</script>
+</body>
+</html>
