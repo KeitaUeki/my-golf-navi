@@ -15,7 +15,8 @@ main{max-width:1060px;margin:auto;padding:26px 24px 56px}
 header{display:flex;justify-content:space-between;align-items:center;gap:16px;margin-bottom:28px}
 .brand{font-size:18px;font-weight:800;letter-spacing:.06em}
 .brand small{display:block;font-size:12px;font-weight:500;color:var(--muted);letter-spacing:.12em}
-nav{display:flex;gap:6px}
+nav{display:flex;gap:6px;flex-shrink:0}
+nav a{white-space:nowrap}
 nav a{padding:10px 12px;text-decoration:none;color:var(--green);font-size:14px;border-radius:24px}
 nav a:hover{background:#e0e9e2}
 h1{font-size:clamp(27px,4vw,38px);line-height:1.35;letter-spacing:-.04em;margin:0 0 8px}
@@ -81,6 +82,13 @@ footer{margin-top:24px;font-size:13px;color:var(--muted)}
  .distance strong{font-size:clamp(28px,9vw,42px)}
  .intro .hint{max-width:30em}.row{flex-wrap:wrap}
 }
+
+#green-map{height:340px;border-radius:14px;isolation:isolate;margin:12px 0;background:#e9f0eb}
+#green-map .leaflet-control-attribution{font-size:12px;line-height:1.4}
+#map-panel{margin:14px 0}
+#map-panel button{margin-bottom:8px}
+#green-selected{padding:10px 12px;background:#edf5e7;border-radius:10px;font-size:14px}
+@media(max-width:400px){header{flex-wrap:wrap;gap:8px}.brand small{display:none}}
 @media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
 </style>
 </head>
@@ -111,8 +119,8 @@ footer{margin-top:24px;font-size:13px;color:var(--muted)}
  </div>
  <div class="recommendation" aria-live="polite">
   <p class="hint">おすすめクラブ</p>
-  <p id="club-result">まずはホールの座標を設定</p>
-  <p id="club-detail" class="hint">下の「ホール設定」で中央の座標を入力してください。</p>
+  <p id="club-result">地図でグリーンを選択</p>
+  <p id="club-detail" class="hint">「ホール」で地図からグリーンを選んでください。</p>
   <p id="club-range" class="hint"></p>
  </div>
  <div class="target" role="group" aria-label="提案の基準">
@@ -147,18 +155,27 @@ footer{margin-top:24px;font-size:13px;color:var(--muted)}
  <label for="hole-select">保存したホール</label>
  <select id="hole-select"><option value="">新しいホールを設定</option></select>
  <form id="green-form">
-  <label>コース・ホール名<input id="hole-name" maxlength="80" placeholder="例 ○○ゴルフ場 OUT 1番"></label>
-  <p class="hint">中央の緯度・経度を入力してください。手前・奥は任意です。地図で調べた小数の座標を使えます。</p>
-  <div id="fields"></div>
-  <details>
-   <summary>手前・奥の座標を入力</summary>
-   <div id="extra-fields"></div>
-  </details>
-  <button class="primary">この座標で距離を計算</button>
-  <div class="row" style="margin-top:10px">
-   <button type="button" id="hole-save" class="secondary">ホールを保存</button>
-   <button type="button" id="hole-delete" class="text-button" hidden>保存ホールを削除</button>
+  <p class="hint">地図を開いてグリーンの中央をタップし、保存するだけ。</p>
+  <button type="button" id="map-open" class="primary secondary" aria-expanded="false" aria-controls="map-panel">地図でグリーンを選ぶ</button>
+  <div id="map-panel" hidden>
+   <button type="button" id="map-locate" class="secondary">現在地の近くを表示</button>
+   <p class="hint">指で地図を動かし、＋で拡大してグリーンの中央をタップしてください。</p>
+   <div id="green-map" aria-label="グリーンを選ぶ地図"></div>
+   <button type="button" id="map-center" class="secondary">地図の真ん中を選ぶ</button>
+   <p class="hint">地図表示には通信を使います。地図はOpenStreetMapから読み込みます。</p>
   </div>
+  <p id="map-status" class="status" role="status"></p>
+  <p id="green-selected" role="status">グリーンはまだ選ばれていません。</p>
+  <label>ホール名（任意）<input id="hole-name" maxlength="80" placeholder="例 ○○ゴルフ場 1番"></label>
+  <button type="button" id="hole-save" class="primary">このグリーンを保存</button>
+  <button type="button" id="hole-delete" class="text-button" hidden>保存ホールを削除</button>
+  <details id="coordinate-details">
+   <summary>詳しい設定（手前・奥など）</summary>
+   <p class="hint">地図で選んだ位置は自動で入ります。手前・奥も測りたい場合は、その位置を入力できます。</p>
+   <div id="fields"></div>
+   <div id="extra-fields"></div>
+   <button class="secondary">入力した位置で距離を計算</button>
+  </details>
  </form>
  <p id="distance-status" class="status" role="status"></p>
 </section>
@@ -186,6 +203,12 @@ let distances = {};
 let target = 'center';
 let requestNumber = 0;
 let demoSnapshot = null;
+let greenMap = null;
+let greenMarker = null;
+let locationMarker = null;
+let leafletLoading = null;
+let mapFocusRequested = false;
+const lastHoleKey = 'my-golf-navi.last-hole.v1';
 
 function readStorage(key, fallback) {
  try {
@@ -223,8 +246,8 @@ for (const {id, label} of points) {
  const container = id === 'center' ? byId('fields') : byId('extra-fields');
  container.insertAdjacentHTML('beforeend', `<fieldset>
   <legend>${label}</legend><div class="coordinates">
-  <label for="${id}-lat">緯度<input id="${id}-lat" type="number" inputmode="decimal" step="any" min="-90" max="90" placeholder="例 35.123456" ${id === 'center' ? 'required' : ''}></label>
-  <label for="${id}-lon">経度<input id="${id}-lon" type="number" inputmode="decimal" step="any" min="-180" max="180" placeholder="例 139.123456" ${id === 'center' ? 'required' : ''}></label>
+  <label for="${id}-lat">緯度<input id="${id}-lat" type="number" inputmode="decimal" step="any" min="-90" max="90" placeholder="例 35.123456" ></label>
+  <label for="${id}-lon">経度<input id="${id}-lon" type="number" inputmode="decimal" step="any" min="-180" max="180" placeholder="例 139.123456" ></label>
   </div></fieldset>`);
 }
 function getCoordinates() {
@@ -245,6 +268,100 @@ function fillCoordinates(coords) {
   byId(id+'-lon').value = validPoint(coords[id]) ? coords[id].lon : '';
  }
 }
+
+function updateMapSelection(recenter = false) {
+ const lat = byId('center-lat').valueAsNumber;
+ const lon = byId('center-lon').valueAsNumber;
+ const point = {lat,lon};
+ const valid = validPoint(point);
+ byId('green-selected').textContent = valid
+  ? 'グリーンを選択済みです。このまま保存できます。'
+  : 'グリーンはまだ選ばれていません。';
+ if (!greenMap) return;
+ if (greenMarker) {
+  greenMap.removeLayer(greenMarker);
+  greenMarker = null;
+ }
+ if (valid) {
+  greenMarker = L.marker([lat,lon]).addTo(greenMap).bindTooltip('グリーン中央');
+  if (recenter) greenMap.setView([lat,lon],18);
+ }
+}
+function showCurrentPositionOnMap() {
+ if (!greenMap || !position || demoSnapshot) return;
+ if (locationMarker) greenMap.removeLayer(locationMarker);
+ locationMarker = L.circleMarker([position.lat,position.lon], {
+  radius:7,color:'#fff',weight:2,fillColor:'#1976d2',fillOpacity:1
+ }).addTo(greenMap).bindTooltip('取得した現在地');
+ if (mapFocusRequested) greenMap.setView([position.lat,position.lon],17);
+}
+function loadLeaflet() {
+ if (window.L) return Promise.resolve();
+ if (leafletLoading) return leafletLoading;
+ leafletLoading = new Promise((resolve,reject) => {
+  const css = document.createElement('link');
+  css.rel = 'stylesheet';
+  css.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
+  document.head.append(css);
+  const script = document.createElement('script');
+  script.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
+  const timeout = setTimeout(() => reject(new Error('timeout')),15000);
+  script.onload = () => {clearTimeout(timeout);resolve()};
+  script.onerror = () => {clearTimeout(timeout);reject(new Error('load'))};
+  document.head.append(script);
+ }).catch(error => {leafletLoading=null;throw error});
+ return leafletLoading;
+}
+function selectGreen(point) {
+ byId('center-lat').value = point.lat.toFixed(7);
+ const longitude = ((point.lng + 180) % 360 + 360) % 360 - 180;
+ byId('center-lon').value = longitude.toFixed(7);
+ updateMapSelection();
+ calculate();
+ byId('map-status').textContent = 'グリーンを選びました。「このグリーンを保存」を押してください。';
+}
+async function openGreenMap() {
+ if (demoSnapshot) {
+  byId('map-status').textContent = '地図で設定するには、先にデモを終了してください。';
+  return;
+ }
+ byId('map-open').disabled = true;
+ byId('map-status').textContent = '地図を読み込み中…';
+ try {
+  await loadLeaflet();
+  if (demoSnapshot) return;
+  byId('map-panel').hidden = false;
+  byId('map-open').setAttribute('aria-expanded','true');
+  if (!greenMap) {
+   greenMap = L.map('green-map', {scrollWheelZoom:false}).setView([36.2,138.2],5);
+   const tiles = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom:19,
+    attribution:'&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+   }).addTo(greenMap);
+   tiles.on('tileerror',() => {
+    byId('map-status').textContent = '地図画像を読み込めません。通信を確認し、地図を開き直してください。';
+   });
+   greenMap.on('click',event => selectGreen(event.latlng));
+  }
+  greenMap.invalidateSize();
+  updateMapSelection(true);
+  showCurrentPositionOnMap();
+  if (!getCoordinates()?.center && position) greenMap.setView([position.lat,position.lon],17);
+  byId('map-status').textContent = 'グリーンを拡大して中央をタップしてください。コースにいるときは「現在地の近くを表示」が使えます。';
+ } catch {
+  byId('map-status').textContent = '地図を読み込めませんでした。通信を確認して、もう一度開いてください。';
+ } finally {
+  byId('map-open').disabled = false;
+ }
+}
+byId('map-open').addEventListener('click',openGreenMap);
+byId('map-locate').addEventListener('click',() => {
+ mapFocusRequested = true;
+ getGPS();
+});
+byId('map-center').addEventListener('click',() => {
+ if (greenMap) selectGreen(greenMap.getCenter());
+});
 function distanceInYards(from, to) {
  const radians = Math.PI / 180;
  const dlat = (to.lat - from.lat) * radians;
@@ -261,6 +378,7 @@ function closestClub(yards, entries) {
  )[0];
 }
 function renderDistances() {
+ updateMapSelection();
  for (const {id} of points) byId(id).textContent = distances[id] ?? '—';
  byId('round-name').textContent = byId('hole-name').value.trim() || 'ホールを設定してください';
  renderRecommendation();
@@ -271,10 +389,10 @@ function renderRecommendation() {
  const range = byId('club-range');
  range.textContent = '';
  if (distances[target] === undefined) {
-  result.textContent = position ? '狙う地点の座標を設定' : 'GPSで現在地を取得';
+  result.textContent = position ? '地図でグリーンを選ぶ' : '現在地を取得する';
   detail.textContent = position
-   ? 'ホール設定で座標を入力し、距離を計算してください。'
-   : 'ホールの座標を設定して、打つ場所で現在地を取得してください。';
+   ? '「ホール」でグリーンの位置を選んでください。'
+   : '保存したホールを選び、打つ場所で下のボタンを押してください。';
   return;
  }
  if (!clubs.length) {
@@ -299,20 +417,21 @@ function calculate() {
  distances = {};
  const coords = getCoordinates();
  if (!coords || !coords.center) {
-  byId('distance-status').textContent = '中央は必須です。入力する地点は緯度と経度を一組で指定してください。';
+  byId('distance-status').textContent = '地図でグリーンを選んでください。詳しい設定では緯度と経度を一組で入力します。';
  } else if (!position) {
-  byId('distance-status').textContent = '座標を設定しました。現在地を取得すると距離が表示されます。';
+  byId('distance-status').textContent = 'グリーンを設定しました。打つ場所で現在地を取得してください。';
  } else {
   for (const {id} of points) {
    if (coords[id]) distances[id] = distanceInYards(position,coords[id]);
   }
-  byId('distance-status').textContent = '入力座標で距離を計算しました。';
+  byId('distance-status').textContent = 'グリーンまでの距離を更新しました。';
  }
  renderDistances();
 }
 function getGPS() {
  const status = byId('gps-status');
  if (!window.isSecureContext || !navigator.geolocation) {
+  mapFocusRequested = false;
   status.textContent = '位置情報を使うには、HTTPSのページを対応ブラウザーで開いてください。';
   return;
  }
@@ -325,10 +444,13 @@ function getGPS() {
   byId('gps').disabled = false;
   const time = new Date(timestamp || Date.now()).toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'});
   status.textContent = `${time} 取得 · 精度の目安 ±${Math.round(coords.accuracy)} m`;
+  showCurrentPositionOnMap();
+  mapFocusRequested = false;
   calculate();
  }, error => {
   if (request !== requestNumber) return;
   byId('gps').disabled = false;
+  mapFocusRequested = false;
   const message = error.code === 1 ? 'ブラウザーの設定で位置情報を許可してください。' :
    error.code === 3 ? '取得がタイムアウトしました。屋外でもう一度お試しください。' :
    '現在地を取得できませんでした。屋外でもう一度お試しください。';
@@ -384,10 +506,11 @@ byId('green-form').addEventListener('submit',event => {
 });
 byId('gps').addEventListener('click',getGPS);
 byId('hole-save').addEventListener('click',() => {
- const name = byId('hole-name').value.trim();
+ const name = byId('hole-name').value.trim() || 'ホール '+(holes.length+1);
+ byId('hole-name').value = name;
  const coords = getCoordinates();
- if (!name || !coords || !coords.center) {
-  byId('distance-status').textContent = 'ホール名と中央の緯度・経度を入力してください。手前・奥は一組ずつ入力できます。';
+ if (!coords || !coords.center) {
+  byId('distance-status').textContent = '地図を開いて、グリーンの中央をタップしてください。';
   byId('green-form').reportValidity();
   return;
  }
@@ -395,6 +518,7 @@ byId('hole-save').addEventListener('click',() => {
  holes.push({name,coords});
  writeStorage(holeKey,holes);
  renderHoles(name);
+ writeStorage(lastHoleKey,name);
  calculate();
  byId('distance-status').textContent = demoSnapshot ? 'デモ内でホールを保存しました。' : name+'を保存しました。';
 });
@@ -403,12 +527,15 @@ byId('hole-select').addEventListener('change',event => {
  byId('hole-name').value = hole ? hole.name : '';
  fillCoordinates(hole ? hole.coords : {});
  byId('hole-delete').hidden = !hole;
+ writeStorage(lastHoleKey,hole ? hole.name : '');
+ updateMapSelection(true);
  calculate();
 });
 byId('hole-delete').addEventListener('click',() => {
  const name = byId('hole-select').value;
  holes = holes.filter(hole => hole.name !== name);
  writeStorage(holeKey,holes);
+ writeStorage(lastHoleKey,'');
  renderHoles();
  byId('distance-status').textContent = name+'の保存を削除しました。入力中の座標は引き続き使えます。';
 });
@@ -444,7 +571,7 @@ for (const {id} of points) {
  for (const axis of ['lat','lon']) {
   byId(id+'-'+axis).addEventListener('input',() => {
    distances = {};
-   byId('distance-status').textContent = '座標を変更しました。「この座標で距離を計算」を押してください。';
+   byId('distance-status').textContent = '位置を変更しました。「入力した位置で距離を計算」を押してください。';
    renderDistances();
   });
  }
@@ -475,6 +602,9 @@ byId('demo-start').addEventListener('click',() => {
  position = {lat:0,lon:0};
  byId('wind').value = '';
  byId('club-form').reset();
+ byId('map-panel').hidden = true;
+ byId('map-open').setAttribute('aria-expanded','false');
+ byId('map-status').textContent = '';
  byId('demo-bar').hidden = false;
  byId('demo-start').hidden = true;
  byId('gps').hidden = true;
@@ -510,7 +640,13 @@ byId('demo-exit').addEventListener('click',() => {
  byId('gps').hidden = false;
 });
 renderClubs();
-renderHoles();
+const lastHole = readStorage(lastHoleKey,'');
+const initialHole = holes.find(hole => hole.name === lastHole) || (holes.length === 1 ? holes[0] : null);
+renderHoles(initialHole ? initialHole.name : '');
+if (initialHole) {
+ byId('hole-name').value = initialHole.name;
+ fillCoordinates(initialHole.coords);
+}
 renderDistances();
 </script>
 </body>
