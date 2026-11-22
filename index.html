@@ -1,80 +1,517 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-<meta charset="UTF-8">
+<meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#123e30">
+<meta name="description" content="自分のキャリー距離でクラブを選ぶ、シンプルなゴルフGPSナビ。">
 <title>MY GOLF NAVI</title>
 <style>
 *{box-sizing:border-box}
-body{margin:0;background:#10251d;color:white;font-family:Arial,sans-serif;padding:20px}
-h1{text-align:center;color:#8df0a7;font-size:27px}
-p{text-align:center;color:#c9d8ce}
-.panel{background:#203d30;border-radius:18px;padding:18px;margin:16px 0}
-label{display:block;margin:12px 0 5px}
-input{width:100%;padding:13px;border:0;border-radius:9px;font-size:16px}
-button{width:100%;padding:15px;border:0;border-radius:12px;background:#8df0a7;color:#10251d;font-weight:bold;font-size:17px;margin-top:12px}
-.distances{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
-.distance{background:#315542;border-radius:12px;padding:15px 5px;text-align:center}
-.distance strong{display:block;font-size:27px;color:#a5ffb5;margin-top:12px}
-.small{font-size:12px;color:#c9d8ce}
+:root{color-scheme:light;--green:#123e30;--lime:#d4f78c;--ink:#192e25;--muted:#586b61;--line:#dce5df}
+html{scroll-behavior:smooth;scroll-padding-top:24px}
+body{margin:0;background:#f0f4f1;color:var(--ink);font:16px/1.6 system-ui,-apple-system,sans-serif}
+main{max-width:1060px;margin:auto;padding:26px 24px 56px}
+header{display:flex;justify-content:space-between;align-items:center;gap:16px;margin-bottom:28px}
+.brand{font-size:18px;font-weight:800;letter-spacing:.06em}
+.brand small{display:block;font-size:12px;font-weight:500;color:var(--muted);letter-spacing:.12em}
+nav{display:flex;gap:6px}
+nav a{padding:10px 12px;text-decoration:none;color:var(--green);font-size:14px;border-radius:24px}
+nav a:hover{background:#e0e9e2}
+h1{font-size:clamp(27px,4vw,38px);line-height:1.35;letter-spacing:-.04em;margin:0 0 8px}
+h2{font-size:20px;line-height:1.4;margin:0 0 14px}
+p{margin:8px 0}
+.intro{margin-bottom:24px}
+.hint{color:var(--muted);font-size:14px}
+.layout{display:grid;grid-template-columns:1.12fr 1fr;gap:20px;align-items:start}
+.stack{display:grid;gap:20px}
+.card{background:#fff;border:1px solid var(--line);border-radius:22px;padding:24px}
+.round{background:var(--green);color:#fff;border:0}
+.round .hint{color:#d0e1d5}
+.topline{display:flex;justify-content:space-between;gap:12px;align-items:center}
+#round-name{margin:0;font-size:17px;overflow-wrap:anywhere}
+.unit{font-size:14px;color:#d0e1d5}
+.distances{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:24px 0}
+.distance{text-align:center;padding:12px 2px;border-radius:14px;background:#204c3c}
+.distance.active{background:var(--lime);color:var(--green)}
+.distance span{font-size:14px}
+.distance strong{display:block;font-size:clamp(26px,5.5vw,42px);line-height:1.3;letter-spacing:-.05em;font-variant-numeric:tabular-nums;overflow-wrap:anywhere;margin:8px 0}
+.recommendation{border-top:1px solid #557666;padding-top:18px}
+#club-result{font-size:28px;font-weight:750;line-height:1.35;margin:10px 0;overflow-wrap:anywhere}
+#club-detail,#club-range{font-size:14px}
+.target{display:flex;gap:6px;margin:16px 0}
+.target button{flex:1;background:transparent;color:#fff;border:1px solid #718d7e;min-height:44px;font-size:14px;padding:8px}
+.target button[aria-pressed="true"]{background:#fff;color:var(--green);border-color:#fff}
+label{display:block;font-size:14px;font-weight:600}
+input,select,textarea,button{font:inherit;border-radius:10px;min-height:48px}
+input,select,textarea{display:block;width:100%;min-width:0;padding:10px 12px;border:1px solid #bdcec2;color:var(--ink);background:#fff;margin:5px 0 12px}
+select{appearance:none;background-image:linear-gradient(45deg,transparent 50%,#123e30 50%),linear-gradient(135deg,#123e30 50%,transparent 50%);background-position:calc(100% - 20px) 21px,calc(100% - 15px) 21px;background-size:5px 5px;background-repeat:no-repeat;padding-right:32px}
+textarea{resize:vertical}
+button{border:0;background:var(--green);color:#fff;padding:11px 16px;font-weight:650;cursor:pointer}
+button:disabled{opacity:.6;cursor:wait}
+.primary{width:100%}
+.round .primary{background:var(--lime);color:var(--green);margin-top:14px}
+.secondary{background:#e9f0eb;color:var(--green)}
+.text-button{background:transparent;color:var(--green);padding:8px 10px;font-size:14px}
+:focus-visible{outline:3px solid #b1790c;outline-offset:3px}
+.row{display:flex;gap:10px;align-items:center}
+.row>*{min-width:0}
+.row label{flex:1}
+.coordinates{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+fieldset{margin:12px 0 0;padding:0;border:0;min-width:0}
+legend{font-weight:650;font-size:14px}
+details summary{cursor:pointer;min-height:48px;padding:12px 0;font-size:14px;color:var(--green)}
+#club-list{padding:0;margin:18px 0 0;list-style:none}
+#club-list li{display:flex;gap:8px;align-items:center;border-top:1px solid var(--line);padding:10px 0}
+.club-info{flex:1;min-width:0;overflow-wrap:anywhere}
+.club-info strong{display:block;font-size:16px}
+.club-info span{font-size:14px;color:var(--muted)}
+#club-list button{font-size:14px;padding:8px;min-width:44px;background:#edf3ee;color:var(--green)}
+.status:empty{display:none}
+.status{font-size:14px;margin-top:12px}
+#storage-status{color:#82420d}
+.demo-bar{background:#e0eccc;border:1px solid #b9ce99;border-radius:12px;padding:12px 16px;margin-bottom:20px;display:flex;justify-content:space-between;gap:8px;align-items:center;font-size:14px}
+[hidden]{display:none!important}
+footer{margin-top:24px;font-size:13px;color:var(--muted)}
+@media(max-width:740px){
+ main{padding:18px 16px 36px}.layout{grid-template-columns:1fr}
+ header{margin-bottom:24px;align-items:flex-start}.brand{font-size:15px}
+ nav{gap:0}nav a{padding:8px;font-size:14px}
+ .card{padding:20px;border-radius:18px}
+ .distance strong{font-size:clamp(28px,9vw,42px)}
+ .intro .hint{max-width:30em}.row{flex-wrap:wrap}
+}
+@media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
 </style>
 </head>
 <body>
-<h1>⛳ MY GOLF NAVI</h1>
-<p>あなたのゴルフをもっと快適に</p>
-<div class="panel">
-<h3>📍 現在地</h3>
-<div id="status">GPS未取得</div>
-<button onclick="getGPS()">現在地を取得する</button>
+<main>
+<header>
+ <div class="brand">MY GOLF NAVI<small>YOUR DISTANCE. YOUR CLUB.</small></div>
+ <nav aria-label="メインメニュー"><a href="#round">ラウンド</a><a href="#setup">ホール</a><a href="#clubs">クラブ</a></nav>
+</header>
+<div class="intro">
+ <h1>次の一打を、自分の距離で。</h1>
+ <p class="hint">残り距離とマイクラブのキャリーを、ひとつの画面に。</p>
+ <button type="button" id="demo-start" class="text-button">デモで使い方を試す</button>
 </div>
-<div class="panel">
-<h3>🏌️ グリーンの座標</h3>
-<p class="small">各地点の緯度・経度を入力してください</p>
-<div id="fields"></div>
-<button onclick="calculate()">距離を計算する</button>
+<div id="demo-bar" class="demo-bar" hidden>
+ <span>デモ表示中 · 距離とクラブはサンプルです</span>
+ <button type="button" id="demo-exit" class="text-button">デモを終了</button>
 </div>
-<div class="panel">
-<h3>グリーンまでの距離</h3>
-<div class="distances">
-<div class="distance">手前<strong id="front">--</strong><span class="small">ヤード</span></div>
-<div class="distance">中央<strong id="center">--</strong><span class="small">ヤード</span></div>
-<div class="distance">奥<strong id="back">--</strong><span class="small">ヤード</span></div>
+<p id="storage-status" class="status" role="status"></p>
+<div class="layout">
+<div class="stack">
+<section id="round" class="card round" aria-labelledby="round-name">
+ <div class="topline"><h2 id="round-name">ホールを設定してください</h2><span class="unit">YARDS</span></div>
+ <div class="distances" aria-live="polite">
+  <div class="distance" data-point="front"><span>手前</span><strong id="front">—</strong></div>
+  <div class="distance active" data-point="center"><span>中央</span><strong id="center">—</strong></div>
+  <div class="distance" data-point="back"><span>奥</span><strong id="back">—</strong></div>
+ </div>
+ <div class="recommendation" aria-live="polite">
+  <p class="hint">おすすめクラブ</p>
+  <p id="club-result">まずはホールの座標を設定</p>
+  <p id="club-detail" class="hint">下の「ホール設定」で中央の座標を入力してください。</p>
+  <p id="club-range" class="hint"></p>
+ </div>
+ <div class="target" role="group" aria-label="提案の基準">
+  <button type="button" data-target="front" aria-pressed="false">手前を狙う</button>
+  <button type="button" data-target="center" aria-pressed="true">中央を狙う</button>
+  <button type="button" data-target="back" aria-pressed="false">奥を狙う</button>
+ </div>
+ <button type="button" id="gps" class="primary">現在地を取得して距離を更新</button>
+ <p id="gps-status" class="status hint" role="status">GPS未取得 · 打つ場所でボタンを押してください。</p>
+ <p class="hint">風・高低差・ランは含めず、登録キャリーと残り距離で提案します。</p>
+</section>
+
+<section id="clubs" class="card" aria-labelledby="clubs-heading">
+ <h2 id="clubs-heading">マイクラブ</h2>
+ <p class="hint">自分のキャリー距離をヤードで登録。同じクラブ名で保存すると更新できます。</p>
+ <form id="club-form">
+  <div class="row">
+   <label>クラブ名<input id="club-name" maxlength="40" placeholder="例 7番アイアン" required></label>
+   <label>キャリー（yd）<input id="club-carry" type="number" inputmode="decimal" min="0.1" max="600" step="0.1" placeholder="例 145" required></label>
+  </div>
+  <button class="primary">クラブを保存</button>
+ </form>
+ <p id="club-status" class="status" role="status"></p>
+ <p id="club-empty" class="hint">まだクラブがありません。よく使う1本から登録できます。</p>
+ <ul id="club-list" aria-label="登録済みクラブ"></ul>
+</section>
+</div>
+
+<div class="stack">
+<section id="setup" class="card" aria-labelledby="setup-heading">
+ <h2 id="setup-heading">ホール設定</h2>
+ <label for="hole-select">保存したホール</label>
+ <select id="hole-select"><option value="">新しいホールを設定</option></select>
+ <form id="green-form">
+  <label>コース・ホール名<input id="hole-name" maxlength="80" placeholder="例 ○○ゴルフ場 OUT 1番"></label>
+  <p class="hint">中央の緯度・経度を入力してください。手前・奥は任意です。地図で調べた小数の座標を使えます。</p>
+  <div id="fields"></div>
+  <details>
+   <summary>手前・奥の座標を入力</summary>
+   <div id="extra-fields"></div>
+  </details>
+  <button class="primary">この座標で距離を計算</button>
+  <div class="row" style="margin-top:10px">
+   <button type="button" id="hole-save" class="secondary">ホールを保存</button>
+   <button type="button" id="hole-delete" class="text-button" hidden>保存ホールを削除</button>
+  </div>
+ </form>
+ <p id="distance-status" class="status" role="status"></p>
+</section>
+<section class="card">
+ <label for="wind">風・ラウンドメモ</label>
+ <textarea id="wind" rows="3" maxlength="2000" placeholder="例 向かい風。グリーン奥は避けたい。"></textarea>
+ <p class="hint">メモ、クラブ、ホールはこのブラウザーに保存されます。</p>
+</section>
 </div>
 </div>
-<div class="panel">
-<h3>🌬️ 風・メモ</h3>
-<input id="wind" placeholder="風向き・風速などを入力">
-</div>
-<p class="small">MY GOLF NAVI Ver.1</p>
+<footer>MY GOLF NAVI · 距離はGPSと入力座標による目安です。現在地は取得した時点の位置を使用します。</footer>
+<noscript>このアプリを使うには、ブラウザーのJavaScriptを有効にしてください。</noscript>
+</main>
 <script>
-let pos=null;
-const names=['手前','中央','奥'];
-document.getElementById('fields').innerHTML=names.map((n,i)=>
-'<label>グリーン'+n+' 緯度</label><input id="lat'+i+'" type="number" step="any" placeholder="緯度">'+
-'<label>グリーン'+n+' 経度</label><input id="lon'+i+'" type="number" step="any" placeholder="経度">'
-).join('');
-function getGPS(){
-if(!navigator.geolocation){alert('GPSに対応していません');return}
-document.getElementById('status').textContent='位置情報を取得中...';
-navigator.geolocation.getCurrentPosition(p=>{
-pos={lat:p.coords.latitude,lon:p.coords.longitude};
-document.getElementById('status').textContent='現在地を取得しました';
-},e=>{document.getElementById('status').textContent='GPSを取得できません。位置情報の許可を確認してください'}, {enableHighAccuracy:true,timeout:15000});
+'use strict';
+const byId = id => document.getElementById(id);
+const points = [
+ {id:'front', label:'手前'}, {id:'center', label:'中央'}, {id:'back', label:'奥'}
+];
+const clubKey = 'my-golf-navi.clubs.v1';
+const holeKey = 'my-golf-navi.holes.v1';
+const memoKey = 'my-golf-navi.memo.v1';
+let position = null;
+let distances = {};
+let target = 'center';
+let requestNumber = 0;
+let demoSnapshot = null;
+
+function readStorage(key, fallback) {
+ try {
+  const value = localStorage.getItem(key);
+  return value === null ? fallback : JSON.parse(value);
+ } catch {
+  byId('storage-status').textContent = '保存データを読み込めませんでした。ブラウザーの保存設定を確認してください。';
+  return fallback;
+ }
 }
-function calculate(){
-if(!pos){alert('先に現在地を取得してください');return}
-names.forEach((n,i)=>{
-let lat=Number(document.getElementById('lat'+i).value);
-let lon=Number(document.getElementById('lon'+i).value);
-if(!lat||!lon){document.getElementById(['front','center','back'][i]).textContent='--';return}
-let r=Math.PI/180;
-let a=pos.lat*r,b=lat*r;
-let dlat=(lat-pos.lat)*r,dlon=(lon-pos.lon)*r;
-let x=Math.sin(dlat/2)**2+Math.cos(a)*Math.cos(b)*Math.sin(dlon/2)**2;
-let meters=6371000*2*Math.atan2(Math.sqrt(x),Math.sqrt(1-x));
-document.getElementById(['front','center','back'][i]).textContent=Math.round(meters*1.09361);
+function writeStorage(key, value) {
+ if (demoSnapshot) return;
+ try {
+  localStorage.setItem(key, JSON.stringify(value));
+ } catch {
+  byId('storage-status').textContent = 'このブラウザーには保存できません。変更はこの画面を開いている間だけ利用できます。';
+ }
+}
+const savedClubs = readStorage(clubKey, []);
+let clubs = Array.isArray(savedClubs) ? savedClubs.filter(club =>
+ club && typeof club.name === 'string' && club.name.trim() &&
+ Number.isFinite(club.carry) && club.carry > 0
+) : [];
+const savedHoles = readStorage(holeKey, []);
+function validPoint(point) {
+ return point && Number.isFinite(point.lat) && Math.abs(point.lat) <= 90 &&
+  Number.isFinite(point.lon) && Math.abs(point.lon) <= 180;
+}
+let holes = Array.isArray(savedHoles) ? savedHoles.filter(hole =>
+ hole && typeof hole.name === 'string' && hole.name.trim() &&
+ hole.coords && validPoint(hole.coords.center)
+) : [];
+
+for (const {id, label} of points) {
+ const container = id === 'center' ? byId('fields') : byId('extra-fields');
+ container.insertAdjacentHTML('beforeend', `<fieldset>
+  <legend>${label}</legend><div class="coordinates">
+  <label for="${id}-lat">緯度<input id="${id}-lat" type="number" inputmode="decimal" step="any" min="-90" max="90" placeholder="例 35.123456" ${id === 'center' ? 'required' : ''}></label>
+  <label for="${id}-lon">経度<input id="${id}-lon" type="number" inputmode="decimal" step="any" min="-180" max="180" placeholder="例 139.123456" ${id === 'center' ? 'required' : ''}></label>
+  </div></fieldset>`);
+}
+function getCoordinates() {
+ const coords = {};
+ for (const {id} of points) {
+  const lat = byId(id+'-lat');
+  const lon = byId(id+'-lon');
+  if (lat.value === '' && lon.value === '') continue;
+  const point = {lat:lat.valueAsNumber, lon:lon.valueAsNumber};
+  if (!lat.validity.valid || !lon.validity.valid || !validPoint(point)) return null;
+  coords[id] = point;
+ }
+ return coords;
+}
+function fillCoordinates(coords) {
+ for (const {id} of points) {
+  byId(id+'-lat').value = validPoint(coords[id]) ? coords[id].lat : '';
+  byId(id+'-lon').value = validPoint(coords[id]) ? coords[id].lon : '';
+ }
+}
+function distanceInYards(from, to) {
+ const radians = Math.PI / 180;
+ const dlat = (to.lat - from.lat) * radians;
+ const dlon = (to.lon - from.lon) * radians;
+ const x = Math.sin(dlat/2)**2 + Math.cos(from.lat*radians) *
+  Math.cos(to.lat*radians) * Math.sin(dlon/2)**2;
+ const clamped = Math.max(0, Math.min(1,x));
+ const meters = 6371000 * 2 * Math.atan2(Math.sqrt(clamped), Math.sqrt(1-clamped));
+ return Math.round(meters * 1.09361);
+}
+function closestClub(yards, entries) {
+ return [...entries].sort((a,b) =>
+  Math.abs(a.carry-yards) - Math.abs(b.carry-yards) || a.carry-b.carry
+ )[0];
+}
+function renderDistances() {
+ for (const {id} of points) byId(id).textContent = distances[id] ?? '—';
+ byId('round-name').textContent = byId('hole-name').value.trim() || 'ホールを設定してください';
+ renderRecommendation();
+}
+function renderRecommendation() {
+ const result = byId('club-result');
+ const detail = byId('club-detail');
+ const range = byId('club-range');
+ range.textContent = '';
+ if (distances[target] === undefined) {
+  result.textContent = position ? '狙う地点の座標を設定' : 'GPSで現在地を取得';
+  detail.textContent = position
+   ? 'ホール設定で座標を入力し、距離を計算してください。'
+   : 'ホールの座標を設定して、打つ場所で現在地を取得してください。';
+  return;
+ }
+ if (!clubs.length) {
+  result.textContent = 'マイクラブを登録';
+  detail.textContent = 'クラブ名とキャリーを登録すると、距離に合う1本を表示します。';
+  return;
+ }
+ const club = closestClub(distances[target], clubs);
+ const label = points.find(point => point.id === target).label;
+ const gap = Math.round((club.carry-distances[target])*10)/10;
+ result.textContent = club.name;
+ detail.textContent = `キャリー ${club.carry} yd · ${label} ${distances[target]} yd に対して` +
+  (gap === 0 ? '距離が一致' : `${Math.abs(gap)} yd ${gap < 0 ? '手前' : '奥'}`);
+ const carries = clubs.map(entry => entry.carry);
+ if (distances[target] > Math.max(...carries)) {
+  range.textContent = '登録クラブの最長キャリーを超えています。最も近いクラブを表示しています。';
+ } else if (distances[target] < Math.min(...carries)) {
+  range.textContent = '登録クラブの最短キャリーより短い距離です。振り幅の調整などを検討してください。';
+ }
+}
+function calculate() {
+ distances = {};
+ const coords = getCoordinates();
+ if (!coords || !coords.center) {
+  byId('distance-status').textContent = '中央は必須です。入力する地点は緯度と経度を一組で指定してください。';
+ } else if (!position) {
+  byId('distance-status').textContent = '座標を設定しました。現在地を取得すると距離が表示されます。';
+ } else {
+  for (const {id} of points) {
+   if (coords[id]) distances[id] = distanceInYards(position,coords[id]);
+  }
+  byId('distance-status').textContent = '入力座標で距離を計算しました。';
+ }
+ renderDistances();
+}
+function getGPS() {
+ const status = byId('gps-status');
+ if (!window.isSecureContext || !navigator.geolocation) {
+  status.textContent = '位置情報を使うには、HTTPSのページを対応ブラウザーで開いてください。';
+  return;
+ }
+ const request = ++requestNumber;
+ byId('gps').disabled = true;
+ status.textContent = '現在地を取得中…';
+ navigator.geolocation.getCurrentPosition(({coords, timestamp}) => {
+  if (request !== requestNumber) return;
+  position = {lat:coords.latitude,lon:coords.longitude};
+  byId('gps').disabled = false;
+  const time = new Date(timestamp || Date.now()).toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'});
+  status.textContent = `${time} 取得 · 精度の目安 ±${Math.round(coords.accuracy)} m`;
+  calculate();
+ }, error => {
+  if (request !== requestNumber) return;
+  byId('gps').disabled = false;
+  const message = error.code === 1 ? 'ブラウザーの設定で位置情報を許可してください。' :
+   error.code === 3 ? '取得がタイムアウトしました。屋外でもう一度お試しください。' :
+   '現在地を取得できませんでした。屋外でもう一度お試しください。';
+  status.textContent = message + (position ? ' 距離は前回取得した位置を使用しています。' : '');
+ }, {enableHighAccuracy:true,timeout:15000,maximumAge:0});
+}
+function renderClubs() {
+ byId('club-list').replaceChildren();
+ byId('club-empty').hidden = clubs.length > 0;
+ for (const club of [...clubs].sort((a,b) => b.carry-a.carry)) {
+  const item = document.createElement('li');
+  const info = document.createElement('div');
+  info.className = 'club-info';
+  const name = document.createElement('strong');
+  name.textContent = club.name;
+  const carry = document.createElement('span');
+  carry.textContent = club.carry+' yd';
+  info.append(name,carry);
+  const edit = document.createElement('button');
+  edit.type = 'button';
+  edit.textContent = '編集';
+  edit.setAttribute('aria-label',club.name+'の距離を編集');
+  edit.addEventListener('click',() => {
+   byId('club-name').value = club.name;
+   byId('club-carry').value = club.carry;
+   byId('club-carry').focus();
+  });
+  const remove = document.createElement('button');
+  remove.type = 'button';
+  remove.textContent = '削除';
+  remove.setAttribute('aria-label',club.name+'を削除');
+  remove.addEventListener('click',() => {
+   clubs = clubs.filter(entry => entry !== club);
+   writeStorage(clubKey,clubs);
+   renderClubs();
+   renderRecommendation();
+   byId('club-status').textContent = club.name+'を削除しました。';
+  });
+  item.append(info,edit,remove);
+  byId('club-list').append(item);
+ }
+}
+function renderHoles(selectedName = '') {
+ const select = byId('hole-select');
+ select.replaceChildren(new Option('新しいホールを設定',''));
+ for (const hole of holes) select.append(new Option(hole.name,hole.name));
+ select.value = selectedName;
+ byId('hole-delete').hidden = !selectedName;
+}
+byId('green-form').addEventListener('submit',event => {
+ event.preventDefault();
+ calculate();
 });
+byId('gps').addEventListener('click',getGPS);
+byId('hole-save').addEventListener('click',() => {
+ const name = byId('hole-name').value.trim();
+ const coords = getCoordinates();
+ if (!name || !coords || !coords.center) {
+  byId('distance-status').textContent = 'ホール名と中央の緯度・経度を入力してください。手前・奥は一組ずつ入力できます。';
+  byId('green-form').reportValidity();
+  return;
+ }
+ holes = holes.filter(hole => hole.name !== name);
+ holes.push({name,coords});
+ writeStorage(holeKey,holes);
+ renderHoles(name);
+ calculate();
+ byId('distance-status').textContent = demoSnapshot ? 'デモ内でホールを保存しました。' : name+'を保存しました。';
+});
+byId('hole-select').addEventListener('change',event => {
+ const hole = holes.find(entry => entry.name === event.target.value);
+ byId('hole-name').value = hole ? hole.name : '';
+ fillCoordinates(hole ? hole.coords : {});
+ byId('hole-delete').hidden = !hole;
+ calculate();
+});
+byId('hole-delete').addEventListener('click',() => {
+ const name = byId('hole-select').value;
+ holes = holes.filter(hole => hole.name !== name);
+ writeStorage(holeKey,holes);
+ renderHoles();
+ byId('distance-status').textContent = name+'の保存を削除しました。入力中の座標は引き続き使えます。';
+});
+byId('club-form').addEventListener('submit',event => {
+ event.preventDefault();
+ const name = byId('club-name').value.trim();
+ const carry = byId('club-carry').valueAsNumber;
+ if (!name || !Number.isFinite(carry) || carry <= 0 || carry > 600) {
+  byId('club-status').textContent = 'クラブ名と0.1〜600 ydのキャリーを入力してください。';
+  return;
+ }
+ clubs = clubs.filter(club => club.name !== name);
+ clubs.push({name,carry});
+ writeStorage(clubKey,clubs);
+ renderClubs();
+ renderRecommendation();
+ byId('club-status').textContent = name+'を'+(demoSnapshot ? 'デモ内で' : '')+'保存しました。';
+ event.currentTarget.reset();
+});
+for (const button of document.querySelectorAll('[data-target]')) {
+ button.addEventListener('click',() => {
+  target = button.dataset.target;
+  for (const choice of document.querySelectorAll('[data-target]')) {
+   choice.setAttribute('aria-pressed',String(choice.dataset.target === target));
+  }
+  for (const box of document.querySelectorAll('[data-point]')) {
+   box.classList.toggle('active',box.dataset.point === target);
+  }
+  renderRecommendation();
+ });
 }
+for (const {id} of points) {
+ for (const axis of ['lat','lon']) {
+  byId(id+'-'+axis).addEventListener('input',() => {
+   distances = {};
+   byId('distance-status').textContent = '座標を変更しました。「この座標で距離を計算」を押してください。';
+   renderDistances();
+  });
+ }
+}
+byId('hole-name').addEventListener('input',renderDistances);
+const memo = readStorage(memoKey,'');
+byId('wind').value = typeof memo === 'string' ? memo : '';
+byId('wind').addEventListener('input',() => writeStorage(memoKey,byId('wind').value));
+
+byId('demo-start').addEventListener('click',() => {
+ const interruptedGPS = byId('gps').disabled;
+ ++requestNumber;
+ byId('gps').disabled = false;
+ const values = {};
+ for (const {id} of points) for (const axis of ['lat','lon']) values[id+'-'+axis] = byId(id+'-'+axis).value;
+ demoSnapshot = {
+  clubs,holes,position,distances,values,target,
+  name:byId('hole-name').value,selected:byId('hole-select').value,
+  memo:byId('wind').value,
+  status:interruptedGPS ? '現在地の取得を中断しました。もう一度取得できます。' : byId('gps-status').textContent,
+  clubName:byId('club-name').value,clubCarry:byId('club-carry').value
+ };
+ clubs = [{name:'6番アイアン',carry:155},{name:'7番アイアン',carry:145},{name:'8番アイアン',carry:130},{name:'PW',carry:100}];
+ holes = [];
+ renderHoles();
+ byId('hole-name').value = 'サンプルホール';
+ fillCoordinates({front:{lat:0.00104,lon:0},center:{lat:0.001167,lon:0},back:{lat:0.00131,lon:0}});
+ position = {lat:0,lon:0};
+ byId('wind').value = '';
+ byId('club-form').reset();
+ byId('demo-bar').hidden = false;
+ byId('demo-start').hidden = true;
+ byId('gps').hidden = true;
+ byId('gps-status').textContent = 'デモの現在地を使用しています。';
+ byId('club-status').textContent = '';
+ document.querySelector('[data-target="center"]').click();
+ renderClubs();
+ calculate();
+ byId('round').scrollIntoView({behavior:'smooth',block:'start'});
+});
+byId('demo-exit').addEventListener('click',() => {
+ if (!demoSnapshot) return;
+ const snapshot = demoSnapshot;
+ clubs = snapshot.clubs;
+ holes = snapshot.holes;
+ position = snapshot.position;
+ distances = snapshot.distances;
+ for (const [id,value] of Object.entries(snapshot.values)) byId(id).value = value;
+ byId('hole-name').value = snapshot.name;
+ byId('wind').value = snapshot.memo;
+ byId('club-name').value = snapshot.clubName;
+ byId('club-carry').value = snapshot.clubCarry;
+ byId('gps-status').textContent = snapshot.status;
+ byId('club-status').textContent = '';
+ byId('distance-status').textContent = '';
+ demoSnapshot = null;
+ renderHoles(snapshot.selected);
+ renderClubs();
+ document.querySelector('[data-target="'+snapshot.target+'"]').click();
+ renderDistances();
+ byId('demo-bar').hidden = true;
+ byId('demo-start').hidden = false;
+ byId('gps').hidden = false;
+});
+renderClubs();
+renderHoles();
+renderDistances();
 </script>
 </body>
 </html>
